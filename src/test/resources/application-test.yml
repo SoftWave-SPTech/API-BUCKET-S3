@@ -1,0 +1,10 @@
+aws:
+  access-key-id: test-key
+  secret-access-key: test-secret
+  region: us-east-1
+  s3:
+    bucket-name: test-bucket
+
+logging:
+  level:
+    com.softwave.s3api: ERROR
