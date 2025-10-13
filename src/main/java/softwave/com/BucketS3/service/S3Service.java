@@ -8,9 +8,12 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import softwave.com.BucketS3.dto.UploadResponse;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class S3Service {
@@ -25,20 +28,27 @@ public class S3Service {
         this.s3Presigner = s3Presigner;
     }
 
-    public String uploadFile(String folder, MultipartFile file) throws IOException {
+    public Map<String, String> uploadFile(String folder, MultipartFile file) throws IOException {
         String key = folder + "/" + file.getOriginalFilename();
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
                 .contentType(file.getContentType())
-                .build(); // ✅ sem .acl()
+                .build();
 
-        s3Client.putObject(putObjectRequest,
-                RequestBody.fromBytes(file.getBytes()));
+        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
 
-        return "File uploaded: " + key;
+        String fileUrl = "https://" + bucketName + ".s3.amazonaws.com/" + key;
+
+        Map<String, String> response = new HashMap<>();
+        response.put("url", fileUrl);
+        response.put("key", key);
+
+        return response;
     }
+
+
 
     public void deleteFile(String key) {
         s3Client.deleteObject(DeleteObjectRequest.builder()
