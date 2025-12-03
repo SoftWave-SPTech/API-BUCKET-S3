@@ -1,1 +1,75 @@
+name: Deploy Microsservico BucketS3
 
+on:
+  push:
+    branches: [ "BucketS3" ]
+  pull_request:
+    branches: [ "BucketS3" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/api-bucket-s3:latest
+
+  deploy-private:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      # Não fazemos checkout aqui, pois o docker-compose.yaml não está neste repo
+      
+      - name: Deploy to Private EC2 via Bastion
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST_PUBLIC }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_host: ${{ secrets.EC2_HOST_PUBLIC }}
+          proxy_username: ${{ secrets.EC2_USER }}
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          host_fingerprint: ignore
+          script: |
+            # 1. Configurar variáveis (Se estiverem hardcoded no Java, pode remover as linhas abaixo, 
+            # mas manter o .env ajuda se decidir mudar para variáveis depois)
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" > .env
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+
+            # 2. Verificar se o Docker Compose existe
+            if [ ! -f "docker-compose.yaml" ]; then
+              echo "❌ ERRO CRÍTICO: O arquivo docker-compose.yaml não foi encontrado na EC2!"
+              echo "👉 Execute o pipeline do repositório PRINCIPAL (backend-softwave) primeiro para criar o arquivo."
+              exit 1
+            fi
+
+            # 3. Atualizar e Reiniciar
+            echo "🔄 Atualizando imagens..."
+            docker-compose pull
+            
+            echo "🚀 Recriando containers..."
+            # O comando abaixo recria apenas o que mudou e mantem as dependências rodando
+            docker-compose up -d --remove-orphans
