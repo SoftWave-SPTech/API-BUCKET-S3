@@ -1,12 +1,8 @@
 package softwave.com.BucketS3.config;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -18,34 +14,42 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        // Lê origens permitidas de variável de ambiente ou usa valores padrão para desenvolvimento
+        // Lê origens permitidas do env CORS_ALLOWED_ORIGINS (formato: "http://a,http://b")
         String allowedOriginsEnv = null;
-        String[] allowedOrigins;
-        
-        if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
-            // Suporta múltiplas origens separadas por vírgula
-            allowedOrigins = allowedOriginsEnv.split(",");
+        List<String> allowedOrigins;
+
+        if (allowedOriginsEnv != null && !allowedOriginsEnv.isBlank()) {
+            allowedOrigins = Arrays.stream(allowedOriginsEnv.split(","))
+                    .map(String::trim)
+                    .flatMap(orig -> {
+                        if (orig.endsWith(":80")) {
+                            // adiciona variante sem :80
+                            return List.of(orig, orig.replaceFirst(":80$", "")).stream();
+                        }
+                        return List.of(orig).stream();
+                    })
+                    .distinct()
+                    .toList();
         } else {
-            // Valores padrão para desenvolvimento local
-            allowedOrigins = new String[]{
+            allowedOrigins = List.of(
                 "http://localhost:5173",
                 "http://localhost:3000",
                 "http://localhost:8080",
-                "http://52.3.112.88:80",
                 "http://52.3.112.88",
+                "http://52.3.112.88:80",
                 "http://52.3.112.88:8080"
-            };
+            );
         }
-        
+
         registry.addMapping("/**")
-                .allowedOrigins(allowedOrigins)
+                .allowedOrigins(allowedOrigins.toArray(new String[0]))
                 .allowedMethods(
                         HttpMethod.GET.name(),
                         HttpMethod.POST.name(),
-                        HttpMethod.DELETE.name(),
-                        HttpMethod.OPTIONS.name(),
                         HttpMethod.PUT.name(),
-                        HttpMethod.PATCH.name()
+                        HttpMethod.PATCH.name(),
+                        HttpMethod.DELETE.name(),
+                        HttpMethod.OPTIONS.name()
                 )
                 .allowedHeaders(
                         "Authorization",
@@ -59,20 +63,10 @@ public class CorsConfig implements WebMvcConfigurer {
                 .exposedHeaders(
                         HttpHeaders.CONTENT_DISPOSITION,
                         "Authorization",
-                        "Content-Type"
+                        "Content-Type",
+                        "Set-Cookie"
                 )
                 .allowCredentials(true)
                 .maxAge(3600);
     }
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins("http://localhost:5173")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true)
-                .exposedHeaders("Set-Cookie"); // Permite exposição de cookies
-    }
 }
-
