@@ -19,7 +19,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         // Lê origens permitidas de variável de ambiente ou usa valores padrão para desenvolvimento
-        String allowedOriginsEnv = System.getenv("CORS_ALLOWED_ORIGINS");
+        String allowedOriginsEnv = null;
         String[] allowedOrigins;
         
         if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
